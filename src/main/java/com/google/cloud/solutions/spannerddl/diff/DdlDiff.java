@@ -46,9 +46,11 @@ import com.google.common.collect.MapDifference.ValueDifference;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -58,6 +60,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * Compares two Cloud Spanner Schema (DDL) files, and can generate the ALTER statements to convert
@@ -84,6 +88,7 @@ public class DdlDiff {
   public static final String ORIGINAL_DDL_FILE_OPT = "originalDdlFile";
   public static final String NEW_DDL_FILE_OPT = "newDdlFile";
   public static final String OUTPUT_DDL_FILE_OPT = "outputDdlFile";
+  public static final String OUTPUT_YAML_FILE_OPT = "outputYamlFile";
   public static final String ALLOW_RECREATE_INDEXES_OPT = "allowRecreateIndexes";
   public static final String ALLOW_RECREATE_CONSTRAINTS_OPT = "allowRecreateConstraints";
   public static final String ALLOW_DROP_STATEMENTS_OPT = "allowDropStatements";
@@ -121,6 +126,61 @@ public class DdlDiff {
     if (!alterDatabaseOptionsDifferences.areEqual() && Strings.isNullOrEmpty(databaseName)) {
       // should never happen, but...
       throw new DdlDiffException("No database ID defined - required for Alter Database statements");
+    }
+  }
+
+  /** Generate the schema.yaml that has table names and column types */
+  public void generateSchemaYaml(Path path) {
+    List<Map<String, Object>> outputTables = new ArrayList<>();
+
+    for (ASTcreate_table_statement table : newDb.tablesInCreationOrder().values()) {
+      Map<String, Object> outputTable = new LinkedHashMap<>();
+      List<Map<String, String>> outputColumns = new ArrayList<>();
+
+      outputTable.put("name", table.getTableName());
+
+      String primaryKey = table.getPrimaryKey().toString();
+      primaryKey = primaryKey.replace("PRIMARY KEY (", "");
+      primaryKey = primaryKey.replace(")", "");
+      primaryKey = primaryKey.replace("ASC", "");
+      primaryKey = primaryKey.replace(" ", "");
+      String[] primaryKeys = primaryKey.split(",");
+      outputTable.put("primary_keys", primaryKeys);
+
+      outputTable.put("columns", outputColumns);
+      outputTables.add(outputTable);
+
+      for (ASTcolumn_def column : table.getColumns().values()) {
+        // skip hidden columns as they are not needed for UQL
+        if (column.isHidden()) {
+          continue;
+        }
+
+        Map<String, String> outputColumn = new LinkedHashMap<>();
+        outputColumns.add(outputColumn);
+
+        outputColumn.put("name", column.getColumnName());
+
+        ASTcolumn_type columnType = column.getColumnType();
+        String type = columnType.toString();
+        if (columnType.isArray() && columnType.getArraySubType().getTypeName().equals("BYTES")) {
+          type = "ARRAY<BLOB>";
+        } else if (columnType.getTypeName().equals("BYTES")) {
+          type = "BLOB";
+        }
+        outputColumn.put("type", type);
+      }
+    }
+
+    try {
+      DumperOptions options = new DumperOptions();
+      options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+
+      Yaml yaml = new Yaml(options);
+      String output = yaml.dump(outputTables);
+      Files.write(path, output.getBytes(UTF_8));
+    } catch (IOException e) {
+      LOG.error(e.getMessage());
     }
   }
 
@@ -780,13 +840,13 @@ public class DdlDiff {
   public static void main(String[] args) {
 
     DdlDiffOptions options = DdlDiffOptions.parseCommandLine(args);
-    ;
     try {
-      List<String> alterStatements =
-          DdlDiff.build(
-                  new String(Files.readAllBytes(options.originalDdlPath()), UTF_8),
-                  new String(Files.readAllBytes(options.newDdlPath()), UTF_8))
-              .generateDifferenceStatements(options.args());
+      DdlDiff ddlDiff = DdlDiff.build(
+              new String(Files.readAllBytes(options.originalDdlPath()), UTF_8),
+              new String(Files.readAllBytes(options.newDdlPath()), UTF_8));
+
+      List<String> alterStatements = ddlDiff.generateDifferenceStatements(options.args());
+      ddlDiff.generateSchemaYaml(options.outputYamlPath());
 
       StringBuilder output = new StringBuilder();
       for (String statement : alterStatements) {
