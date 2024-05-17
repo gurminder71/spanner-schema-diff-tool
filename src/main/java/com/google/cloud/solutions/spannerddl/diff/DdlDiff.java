@@ -46,6 +46,7 @@ import com.google.common.collect.MapDifference.ValueDifference;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -84,6 +85,7 @@ public class DdlDiff {
   public static final String ORIGINAL_DDL_FILE_OPT = "originalDdlFile";
   public static final String NEW_DDL_FILE_OPT = "newDdlFile";
   public static final String OUTPUT_DDL_FILE_OPT = "outputDdlFile";
+  public static final String OUTPUT_YAML_FILE_OPT = "outputYamlFile";
   public static final String ALLOW_RECREATE_INDEXES_OPT = "allowRecreateIndexes";
   public static final String ALLOW_RECREATE_CONSTRAINTS_OPT = "allowRecreateConstraints";
   public static final String ALLOW_DROP_STATEMENTS_OPT = "allowDropStatements";
@@ -121,6 +123,22 @@ public class DdlDiff {
     if (!alterDatabaseOptionsDifferences.areEqual() && Strings.isNullOrEmpty(databaseName)) {
       // should never happen, but...
       throw new DdlDiffException("No database ID defined - required for Alter Database statements");
+    }
+  }
+
+  /** Generate the schema.yaml that represents a summary of schema.sql */
+  public void generateSchemaYaml(Path path) {
+    Schema schema =
+        new Schema(
+            newDb.tablesInCreationOrder().values(),
+            newDb.indexes().values(),
+            newDb.searchIndexes().values());
+
+    try {
+      schema.writeToYaml(path);
+    } catch (IOException e) {
+      LOG.error(e.getMessage());
+      System.exit(1);
     }
   }
 
@@ -775,18 +793,18 @@ public class DdlDiff {
   /**
    * Main entrypoint for this tool.
    *
-   * @see DdlDiffOptions.java for command line options.
+   * @see DdlDiffOptions for command line options.
    */
   public static void main(String[] args) {
-
     DdlDiffOptions options = DdlDiffOptions.parseCommandLine(args);
-    ;
     try {
-      List<String> alterStatements =
+      DdlDiff ddlDiff =
           DdlDiff.build(
-                  new String(Files.readAllBytes(options.originalDdlPath()), UTF_8),
-                  new String(Files.readAllBytes(options.newDdlPath()), UTF_8))
-              .generateDifferenceStatements(options.args());
+              new String(Files.readAllBytes(options.originalDdlPath()), UTF_8),
+              new String(Files.readAllBytes(options.newDdlPath()), UTF_8));
+
+      List<String> alterStatements = ddlDiff.generateDifferenceStatements(options.args());
+      ddlDiff.generateSchemaYaml(options.outputYamlPath());
 
       StringBuilder output = new StringBuilder();
       for (String statement : alterStatements) {

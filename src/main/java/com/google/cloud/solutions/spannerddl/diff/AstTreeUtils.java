@@ -31,6 +31,17 @@ import java.util.stream.StreamSupport;
 public class AstTreeUtils {
 
   /** Gets (and casts) the first found child of a specific node type. */
+  public static <T> T getOptionalChildByType(Node node, Class<T> type) {
+    for (int i = 0, count = node.jjtGetNumChildren(); i < count; i++) {
+      Node child = node.jjtGetChild(i);
+      if (type.isInstance(child)) {
+        return type.cast(child);
+      }
+    }
+    return null;
+  }
+
+  /** Gets (and casts) the first found child of a specific node type. */
   public static <T> T getOptionalChildByType(Node[] children, Class<T> type) {
     for (Node child : children) {
       if (type.isInstance(child)) {
@@ -38,6 +49,18 @@ public class AstTreeUtils {
       }
     }
     return null;
+  }
+
+  /**
+   * Gets (and casts) the first found child of a specific node type, throwing an exception if it
+   * does not exist.
+   */
+  public static <T> T getChildByType(Node node, Class<T> type) {
+    T child = getOptionalChildByType(node, type);
+    if (child == null) {
+      throw new IllegalArgumentException("Cannot find child of type " + type.getName());
+    }
+    return child;
   }
 
   /**
