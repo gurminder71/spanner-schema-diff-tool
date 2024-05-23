@@ -25,6 +25,7 @@ import com.google.cloud.solutions.spannerddl.parser.ASTcheck_constraint;
 import com.google.cloud.solutions.spannerddl.parser.ASTcolumn_def;
 import com.google.cloud.solutions.spannerddl.parser.ASTcolumn_default_clause;
 import com.google.cloud.solutions.spannerddl.parser.ASTcolumn_type;
+import com.google.cloud.solutions.spannerddl.parser.ASTcolumns;
 import com.google.cloud.solutions.spannerddl.parser.ASTcreate_change_stream_statement;
 import com.google.cloud.solutions.spannerddl.parser.ASTcreate_index_statement;
 import com.google.cloud.solutions.spannerddl.parser.ASTcreate_search_index_statement;
@@ -33,6 +34,9 @@ import com.google.cloud.solutions.spannerddl.parser.ASTddl_statement;
 import com.google.cloud.solutions.spannerddl.parser.ASTforeign_key;
 import com.google.cloud.solutions.spannerddl.parser.ASToptions_clause;
 import com.google.cloud.solutions.spannerddl.parser.ASTrow_deletion_policy_clause;
+import com.google.cloud.solutions.spannerddl.parser.ASTstored_column;
+import com.google.cloud.solutions.spannerddl.parser.ASTstored_column_list;
+import com.google.cloud.solutions.spannerddl.parser.ASTtable;
 import com.google.cloud.solutions.spannerddl.parser.DdlParser;
 import com.google.cloud.solutions.spannerddl.parser.DdlParserTreeConstants;
 import com.google.cloud.solutions.spannerddl.parser.ParseException;
@@ -41,6 +45,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.MapDifference.ValueDifference;
 import com.google.common.collect.Maps;
@@ -49,8 +54,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -132,11 +137,36 @@ public class DdlDiff {
   /** Generate the schema.yaml that has table names and column types */
   public void generateSchemaYaml(Path path) {
     List<Map<String, Object>> outputTables = new ArrayList<>();
+    List<Map<String, Object>> outputIndexes = new ArrayList<>();
+
+    for (ASTcreate_index_statement index : newDb.indexes().values()) {
+      Map<String, Object> outputIndex = new LinkedHashMap<>();
+      outputIndex.put("name", index.getIndexName());
+      outputIndex.put("table", AstTreeUtils.getChildByType(index, ASTtable.class).toString());
+
+      String columnsStr = AstTreeUtils.getChildByType(index, ASTcolumns.class).toString();
+      columnsStr = columnsStr.replace("(", "");
+      columnsStr = columnsStr.replace(")", "");
+      columnsStr = columnsStr.replace("ASC", "");
+      columnsStr = columnsStr.replace(" ", "");
+      String[] columns = columnsStr.split(",");
+      outputIndex.put("columns", columns);
+
+      ASTstored_column_list storedColumnList =
+          AstTreeUtils.getOptionalChildByType(index, ASTstored_column_list.class);
+      if (storedColumnList != null) {
+        List<String> storedColumnNames = new ArrayList<>();
+        for (ASTstored_column storedColumn : storedColumnList.getStoredColumns()) {
+          storedColumnNames.add(storedColumn.toString());
+        }
+        outputIndex.put("stored_columns", storedColumnNames);
+      }
+
+      outputIndexes.add(outputIndex);
+    }
 
     for (ASTcreate_table_statement table : newDb.tablesInCreationOrder().values()) {
       Map<String, Object> outputTable = new LinkedHashMap<>();
-      List<Map<String, String>> outputColumns = new ArrayList<>();
-
       outputTable.put("name", table.getTableName());
 
       String primaryKey = table.getPrimaryKey().toString();
@@ -147,6 +177,7 @@ public class DdlDiff {
       String[] primaryKeys = primaryKey.split(",");
       outputTable.put("primary_keys", primaryKeys);
 
+      List<Map<String, String>> outputColumns = new ArrayList<>();
       outputTable.put("columns", outputColumns);
       outputTables.add(outputTable);
 
@@ -177,7 +208,7 @@ public class DdlDiff {
       options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
 
       Yaml yaml = new Yaml(options);
-      String output = yaml.dump(outputTables);
+      String output = yaml.dump(ImmutableMap.of("tables", outputTables, "indexes", outputIndexes));
       Files.write(path, output.getBytes(UTF_8));
     } catch (IOException e) {
       LOG.error(e.getMessage());
@@ -835,13 +866,14 @@ public class DdlDiff {
   /**
    * Main entrypoint for this tool.
    *
-   * @see DdlDiffOptions.java for command line options.
+   * @see DdlDiffOptions for command line options.
    */
   public static void main(String[] args) {
 
     DdlDiffOptions options = DdlDiffOptions.parseCommandLine(args);
     try {
-      DdlDiff ddlDiff = DdlDiff.build(
+      DdlDiff ddlDiff =
+          DdlDiff.build(
               new String(Files.readAllBytes(options.originalDdlPath()), UTF_8),
               new String(Files.readAllBytes(options.newDdlPath()), UTF_8));
 

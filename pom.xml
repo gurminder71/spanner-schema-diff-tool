@@ -155,8 +155,8 @@
               <version>${error-prone.version}</version>
             </path>
           </annotationProcessorPaths>
-            <source>9</source>
-            <target>9</target>
+          <source>9</source>
+          <target>9</target>
         </configuration>
       </plugin>
       <plugin>
@@ -164,7 +164,6 @@
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>${maven-checkstyle-plugin.version}</version>
         <configuration>
-          <encoding>UTF-8</encoding>
           <consoleOutput>true</consoleOutput>
           <failsOnError>true</failsOnError>
           <failOnViolation>true</failOnViolation>

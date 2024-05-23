@@ -158,7 +158,7 @@ public abstract class DdlDiffOptions {
       Path outputDdlPath =
           new File(commandLine.getOptionValue(DdlDiff.OUTPUT_DDL_FILE_OPT)).toPath();
       Path outputYamlPath =
-              new File(commandLine.getOptionValue(DdlDiff.OUTPUT_YAML_FILE_OPT)).toPath();
+          new File(commandLine.getOptionValue(DdlDiff.OUTPUT_YAML_FILE_OPT)).toPath();
 
       ImmutableMap<String, Boolean> argsMap =
           ImmutableMap.of(
@@ -169,7 +169,8 @@ public abstract class DdlDiffOptions {
               DdlDiff.ALLOW_RECREATE_CONSTRAINTS_OPT,
                   commandLine.hasOption(DdlDiff.ALLOW_RECREATE_CONSTRAINTS_OPT));
 
-      return new AutoValue_DdlDiffOptions(originalDdlPath, newDdlPath, outputDdlPath, outputYamlPath, argsMap);
+      return new AutoValue_DdlDiffOptions(
+          originalDdlPath, newDdlPath, outputDdlPath, outputYamlPath, argsMap);
     } catch (InvalidPathException e) {
       System.err.println("Invalid file path: " + e.getInput() + "\n" + e.getReason());
       printHelpAndExit(0);
