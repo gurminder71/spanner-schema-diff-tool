@@ -33,6 +33,7 @@ import com.google.cloud.solutions.spannerddl.parser.ASTcreate_table_statement;
 import com.google.cloud.solutions.spannerddl.parser.ASTddl_statement;
 import com.google.cloud.solutions.spannerddl.parser.ASTforeign_key;
 import com.google.cloud.solutions.spannerddl.parser.ASToptions_clause;
+import com.google.cloud.solutions.spannerddl.parser.ASTpartition_key;
 import com.google.cloud.solutions.spannerddl.parser.ASTrow_deletion_policy_clause;
 import com.google.cloud.solutions.spannerddl.parser.ASTstored_column;
 import com.google.cloud.solutions.spannerddl.parser.ASTstored_column_list;
@@ -176,6 +177,17 @@ public class DdlDiff {
       columnsStr = columnsStr.replace(")", "");
       columnsStr = columnsStr.replace("ASC", "");
       columnsStr = columnsStr.replace(" ", "");
+
+      ASTpartition_key partitionKey =
+          AstTreeUtils.getOptionalChildByType(index, ASTpartition_key.class);
+      if (partitionKey != null) {
+        String partitionStr = partitionKey.toString();
+        partitionStr = partitionStr.replace("PARTITION BY ", "");
+        partitionStr = partitionStr.replace("ASC", "");
+        partitionStr = partitionStr.replace(" ", "");
+        columnsStr = columnsStr + "," + partitionStr;
+      }
+
       String[] columns = columnsStr.split(",");
       outputIndex.put("columns", columns);
 
