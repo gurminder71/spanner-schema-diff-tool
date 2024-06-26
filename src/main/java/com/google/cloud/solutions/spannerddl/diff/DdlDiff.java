@@ -37,6 +37,7 @@ import com.google.cloud.solutions.spannerddl.parser.ASTrow_deletion_policy_claus
 import com.google.cloud.solutions.spannerddl.parser.ASTstored_column;
 import com.google.cloud.solutions.spannerddl.parser.ASTstored_column_list;
 import com.google.cloud.solutions.spannerddl.parser.ASTtable;
+import com.google.cloud.solutions.spannerddl.parser.ASTtoken_key_list;
 import com.google.cloud.solutions.spannerddl.parser.DdlParser;
 import com.google.cloud.solutions.spannerddl.parser.DdlParserTreeConstants;
 import com.google.cloud.solutions.spannerddl.parser.ParseException;
@@ -145,6 +146,32 @@ public class DdlDiff {
       outputIndex.put("table", AstTreeUtils.getChildByType(index, ASTtable.class).toString());
 
       String columnsStr = AstTreeUtils.getChildByType(index, ASTcolumns.class).toString();
+      columnsStr = columnsStr.replace("(", "");
+      columnsStr = columnsStr.replace(")", "");
+      columnsStr = columnsStr.replace("ASC", "");
+      columnsStr = columnsStr.replace(" ", "");
+      String[] columns = columnsStr.split(",");
+      outputIndex.put("columns", columns);
+
+      ASTstored_column_list storedColumnList =
+          AstTreeUtils.getOptionalChildByType(index, ASTstored_column_list.class);
+      if (storedColumnList != null) {
+        List<String> storedColumnNames = new ArrayList<>();
+        for (ASTstored_column storedColumn : storedColumnList.getStoredColumns()) {
+          storedColumnNames.add(storedColumn.toString());
+        }
+        outputIndex.put("stored_columns", storedColumnNames);
+      }
+
+      outputIndexes.add(outputIndex);
+    }
+
+    for (ASTcreate_search_index_statement index : newDb.searchIndexes().values()) {
+      Map<String, Object> outputIndex = new LinkedHashMap<>();
+      outputIndex.put("name", index.getName());
+      outputIndex.put("table", AstTreeUtils.getChildByType(index, ASTtable.class).toString());
+
+      String columnsStr = AstTreeUtils.getChildByType(index, ASTtoken_key_list.class).toString();
       columnsStr = columnsStr.replace("(", "");
       columnsStr = columnsStr.replace(")", "");
       columnsStr = columnsStr.replace("ASC", "");
