@@ -1,0 +1,87 @@
+== Test 1 Table with STORED and HIDDEN columns
+
+tables:
+- name: org_user
+  primary_keys:
+  - farm_fingerprint_org_user_id
+  - org_user_id
+  columns:
+  - name: farm_fingerprint_org_user_id
+    type: INT64
+    is_stored: true
+  - name: org_user_id
+    type: STRING(36)
+  - name: first_name
+    type: STRING(256)
+  - name: first_name_lower
+    type: STRING(256)
+    is_stored: true
+  - name: created_at
+    type: TIMESTAMP
+  - name: created_at_micro
+    type: INT64
+
+indexes: []
+
+== Test 3 column annotation
+
+tables:
+- name: org_user
+  uql_enabled: true
+  primary_keys:
+  - org_user_id
+  columns:
+  - name: org_user_id
+    type: STRING(36)
+  - name: first_name
+    type: STRING(256)
+    annotations:
+    - name: DEPRECATED
+    - ns: PII
+      name: USER_PROFILE
+      params:
+        level1Profile: null
+    - ns: TAGS
+      name: business
+      params:
+        key1: val1
+        key2: val2
+indexes: []
+
+== Test 4 Index without stored columns
+
+tables: []
+indexes:
+- name: OrgUserByOrgUnitIdAndOrgUserId
+  table: org_user
+  columns:
+  - org_unit_id
+  - org_user_id
+
+== Test 5 Index with stored columns
+
+tables: []
+indexes:
+- name: OrgUserByOrgUnitIdAndOrgUserId
+  table: org_user
+  columns:
+  - org_unit_id
+  - org_user_id
+  stored_columns:
+  - domain
+
+== Test 6 Search index
+
+tables: []
+indexes:
+- name: OrgUserSearchInOrganization
+  table: org_user
+  columns:
+  - first_name_token
+  - last_name_token
+  - organization_id
+  stored_columns:
+  - org_unit_id
+  - domain
+
+==

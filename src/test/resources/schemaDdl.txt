@@ -1,0 +1,40 @@
+== Test 1 Table with STORED and HIDDEN columns
+
+CREATE TABLE org_user (
+  farm_fingerprint_org_user_id INT64 AS (farm_fingerprint(org_user_id)) STORED,
+  org_user_id STRING(36) NOT NULL,
+  first_name STRING(256),
+  first_name_lower STRING(256) AS (LOWER(first_name)) STORED HIDDEN,
+  first_name_token TOKENLIST AS (TOKEN(first_name_lower)) HIDDEN,
+  created_at TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp = true),
+  created_at_micro INT64 NOT NULL DEFAULT (UNIX_MICROS(CURRENT_TIMESTAMP())) HIDDEN,
+) PRIMARY KEY(farm_fingerprint_org_user_id, org_user_id);
+
+== Test 3 column annotation
+
+CREATE TABLE org_user (
+  org_user_id STRING(36) NOT NULL,
+  -- @ANNOTATION DEPRECATED,
+  -- @ANNOTATION PII.USER_PROFILE(level1Profile),
+  -- @ANNOTATION TAGS.business(key1=val1,key2=val2),
+  first_name STRING(256),
+) PRIMARY KEY(org_user_id);
+
+== Test 4 Index without stored columns
+
+CREATE INDEX OrgUserByOrgUnitIdAndOrgUserId ON org_user(org_unit_id, org_user_id);
+
+== Test 5 Index with stored columns
+
+CREATE INDEX OrgUserByOrgUnitIdAndOrgUserId ON org_user(org_unit_id, org_user_id) STORING(domain);
+
+== Test 6 Search index
+
+CREATE SEARCH INDEX OrgUserSearchInOrganization ON org_user(
+  first_name_token, last_name_token)
+STORING(org_unit_id, domain)
+PARTITION BY organization_id
+ORDER BY created_at_micro DESC
+OPTIONS (sort_order_sharding=true);
+
+==
