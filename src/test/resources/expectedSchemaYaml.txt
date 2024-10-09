@@ -16,15 +16,10 @@ tables:
   - name: first_name_lower
     type: STRING(256)
     is_stored: true
-    is_hidden: true
-  - name: first_name_token
-    type: TOKENLIST
-    is_hidden: true
   - name: created_at
     type: TIMESTAMP
   - name: created_at_micro
     type: INT64
-    is_hidden: true
 
 indexes: []
 

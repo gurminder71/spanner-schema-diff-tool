@@ -8,7 +8,6 @@ public class Column {
   public String name;
   public String type;
   public Boolean is_stored;
-  public Boolean is_hidden;
   public List<Annotation> annotations;
 
   public Column(ASTcolumn_def column) {
@@ -17,8 +16,9 @@ public class Column {
     if (column.isStored()) {
       is_stored = column.isStored();
     }
-    if (column.isHidden()) {
-      is_hidden = column.isHidden();
-    }
+  }
+
+  public static boolean isTokenListColumn(ASTcolumn_def column) {
+    return column.getColumnTypeString().equalsIgnoreCase("TOKENLIST");
   }
 }

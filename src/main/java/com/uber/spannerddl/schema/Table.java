@@ -22,6 +22,7 @@ public class Table {
     primary_keys = Util.getKeyColumns(table.getPrimaryKey());
     columns =
         table.getColumns().values().stream()
+            .filter(c -> !Column.isTokenListColumn(c))
             .map(Column::new)
             .collect(Collectors.toList());
 
