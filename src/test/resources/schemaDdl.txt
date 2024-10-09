@@ -6,6 +6,8 @@ CREATE TABLE org_user (
   first_name STRING(256),
   first_name_lower STRING(256) AS (LOWER(first_name)) STORED HIDDEN,
   first_name_token TOKENLIST AS (TOKEN(first_name_lower)) HIDDEN,
+  created_at TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp = true),
+  created_at_micro INT64 NOT NULL DEFAULT (UNIX_MICROS(CURRENT_TIMESTAMP())) HIDDEN,
 ) PRIMARY KEY(farm_fingerprint_org_user_id, org_user_id);
 
 == Test 3 column annotation
